@@ -48,7 +48,6 @@ local function OnExit(job_id, exit_code, event_type)
         message = "Aider process exited with code: " .. exit_code
       end
       vim.api.nvim_buf_set_lines(M.aider_buf, -1, -1, false, { "", message })
-      vim.api.nvim_buf_set_option(M.aider_buf, "modifiable", false)
     end
     log("Aider process exited with code: " .. exit_code)
   end)
@@ -70,8 +69,14 @@ function M.AiderOpen(args, window_type)
     log("Final command: " .. command)
     log("Opening terminal with command")
     M.aider_buf = vim.api.nvim_get_current_buf()
-    M.aider_job_id = vim.fn.termopen(command, { on_exit = OnExit })
-    log("Terminal opened with job ID: " .. M.aider_job_id)
+    M.aider_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(M.aider_buf, "AiderChat")
+    vim.api.nvim_buf_set_option(M.aider_buf, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(M.aider_buf, "bufhidden", "hide")
+    vim.api.nvim_buf_set_option(M.aider_buf, "swapfile", false)
+    vim.api.nvim_buf_set_option(M.aider_buf, "modifiable", true)
+    helpers.open_buffer_in_new_window(window_type, M.aider_buf)
+    log("Aider buffer created with ID: " .. M.aider_buf)
     log("Set aider_buf to: " .. M.aider_buf)
     vim.bo[M.aider_buf].bufhidden = "hide"
     vim.bo[M.aider_buf].filetype = "AiderConsole"
@@ -92,7 +97,7 @@ function M.AiderOnBufferOpen(bufnr)
   local relative_filename = vim.fn.fnamemodify(bufname, ":~:.")
   if M.aider_buf and vim.api.nvim_buf_is_valid(M.aider_buf) then
     local line_to_add = "/add " .. relative_filename
-    vim.fn.chansend(M.aider_job_id, line_to_add .. "\n")
+    vim.api.nvim_buf_set_lines(M.aider_buf, -1, -1, false, { line_to_add })
   end
 end
 
@@ -108,7 +113,7 @@ function M.AiderOnBufferClose(bufnr)
   local relative_filename = vim.fn.fnamemodify(bufname, ":~:.")
   if M.aider_buf and vim.api.nvim_buf_is_valid(M.aider_buf) then
     local line_to_drop = "/drop " .. relative_filename
-    vim.fn.chansend(M.aider_job_id, line_to_drop .. "\n")
+    vim.api.nvim_buf_set_lines(M.aider_buf, -1, -1, false, { line_to_drop })
   end
 end
 
@@ -142,7 +147,7 @@ function M.AiderAddModifiedFiles()
   local modified_files = helpers.get_git_modified_files()
   for _, file in ipairs(modified_files) do
     local line_to_add = "/add " .. file
-    vim.fn.chansend(M.aider_job_id, line_to_add .. "\n")
+    vim.api.nvim_buf_set_lines(M.aider_buf, -1, -1, false, { line_to_add })
   end
   vim.notify("Added " .. #modified_files .. " modified files to Aider chat")
 end
